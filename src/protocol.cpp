@@ -1,37 +1,167 @@
 #include "protocol.hpp"
 
-#include <algorithm>
-
 namespace Protocol {
-    namespace {
-        // Strips trailing '\n' and '\r' line endings from a message
-        std::string stripLineEnding(std::string s) {
-            if (!s.empty() && s.back() == '\n') // Endline
-                s.pop_back();
-            if (!s.empty() && s.back() == '\r') // Escape sequence
-                s.pop_back();
-            return s;
-        }
 
-        // Splits a string into fields delimited by '|', preserving empty tokens
-        std::vector<std::string> splitByPipe(const std::string& s) {
-            std::vector<std::string> parts;
-            std::size_t start = 0;
+    // 1. Extract complete frames from TCP receive buffer
+    FrameResult extractFrames(std::string& buffer) {
+        FrameResult result;
 
-            while (true) {
-                std::size_t pos = s.find('|', start);
-                if (pos == std::string::npos) {
-                    parts.push_back(s.substr(start));
-                    break;
-                }
-                parts.push_back(s.substr(start, pos - start));
-                start = pos + 1;
+        std::size_t newline_position;
+
+        // Keep extracting while a newline exists
+        while ((newline_position = buffer.find('\n')) != std::string::npos) {
+
+            // Check the payload size before extracting
+            if (newline_position > MAX_MESSAGE_SIZE) {
+                result.too_large = true;
+                buffer.clear();
+                return result;
             }
-            return parts;
-        }
-    } // namespace
 
-    bool isValidMessage(const std::string& message) {
-        return !message.empty();
+            // Extract everything before '\n'
+            result.frames.push_back(
+                buffer.substr(0, newline_position)
+            );
+
+            // Remove the extracted frame and its '\n'
+            buffer.erase(0, newline_position + 1);
+        }
+
+        // No complete frame remains
+        // Check whether the incomplete buffer is already too large
+        if (buffer.size() > MAX_MESSAGE_SIZE) {
+            result.too_large = true;
+            buffer.clear();
+        }
+
+        return result;
     }
-} // namespace
+
+    // 2. Parse a client request
+    std::optional<Request> parseRequest(const std::string& line) {
+        // Reject empty or oversized messages
+        if (line.empty() || line.size() > MAX_MESSAGE_SIZE)
+            return std::nullopt;
+
+        // A frame must not contain another newline.
+        if (line.find('\n') != std::string::npos)
+            return std::nullopt;
+
+        Request request;
+
+        // Find the first separator
+        std::size_t separator_position = line.find('|');
+
+        // No separator means the command has no parameters.
+        if (separator_position == std::string::npos) {
+            request.command = line;
+            return request;
+        }
+
+        // Extract the command
+        request.command = line.substr(0, separator_position);
+
+        if (request.command.empty()) {
+            return std::nullopt;
+        }
+
+        // Extract everything after the first '|'
+        request.raw_parameters =
+            line.substr(separator_position + 1);
+
+        // Split parameters while preserving empty tokens
+        std::size_t start = 0;
+
+        while (true) {
+            std::size_t next_separator =
+                request.raw_parameters.find('|', start);
+
+            if (next_separator == std::string::npos) {
+                request.params.push_back(
+                    request.raw_parameters.substr(start)
+                );
+                break;
+            }
+
+            request.params.push_back(
+                request.raw_parameters.substr(
+                    start,
+                    next_separator - start
+                )
+            );
+
+            start = next_separator + 1;
+        }
+
+        return request;
+    }
+
+    // 3. Parse a server response
+    std::optional<Response> parseResponse(const std::string& line) {
+
+        if (line.empty() || line.size() > MAX_MESSAGE_SIZE)
+            return std::nullopt;
+
+        if (line.find('\n') != std::string::npos)
+            return std::nullopt;
+
+        // Find the first separators
+        std::size_t first_separator = line.find('|');
+
+        if (first_separator == std::string::npos)
+            return std::nullopt;
+
+        // Find the second separators
+        std::size_t second_separator =
+            line.find('|', first_separator + 1);
+
+        if (second_separator == std::string::npos)
+            return std::nullopt;
+
+        // Extract the response type
+        std::string status = line.substr(0, first_separator);
+
+        // Extract the response code
+        std::string code = line.substr(
+            first_separator + 1,
+            second_separator - first_separator - 1
+        );
+
+        // Only OK and ERROR are accepted
+        if (status != "OK" && status != "ERROR") {
+            return std::nullopt;
+        }
+
+        // The response code must not be empty
+        if (code.empty()) {
+            return std::nullopt;
+        }
+
+        Response response;
+
+        response.ok = (status == "OK");
+        response.code = code;
+
+        // Keep the remaining payload as-is
+        response.payload = line.substr(second_separator + 1);
+
+        return response;
+    }
+
+    // 4. Format a successful response
+    std::string formatOK(
+        const std::string& code,
+        const std::string& data
+    ) {
+        return "OK|" + code + "|" + data + "\n";
+    }
+
+    // 5. Format an error response
+    std::string formatError(
+        const std::string& error_code,
+        const std::string& description
+    ) {
+        return "ERROR|" + error_code + "|" + description + "\n";
+    }
+
+} // namespace Protocol
