@@ -9,7 +9,7 @@ private:
     UniqueFd client_fd_;
     std::string recv_buffer_;
 
-    void sendAll(const std::string& data);
+    bool sendAll(const std::string& data);
     void handleLine(const std::string& line);
 
 public:
@@ -24,4 +24,5 @@ public:
 
     void run();
     int getClientFd() const noexcept;
+
 };
