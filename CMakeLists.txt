@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.16)
 
 project(CTSMS
@@ -10,6 +9,12 @@ project(CTSMS
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Enable testing
+enable_testing()
+
+# Find threading support
+find_package(Threads REQUIRED)
 
 # Include project headers
 include_directories(${PROJECT_SOURCE_DIR}/include)
@@ -28,9 +33,10 @@ target_link_libraries(protocol_tests
     PRIVATE ctsms_protocol
 )
 
-# Enable testing
-enable_testing()
-add_test(NAME ProtocolTests COMMAND protocol_tests)
+add_test(
+    NAME ProtocolTests
+    COMMAND protocol_tests
+)
 
 # Build the client handler tests
 add_executable(client_handler_tests
@@ -39,7 +45,7 @@ add_executable(client_handler_tests
 )
 
 target_link_libraries(client_handler_tests
-    PRIVATE ctsms_protocol
+    PRIVATE ctsms_protocol Threads::Threads
 )
 
 add_test(
