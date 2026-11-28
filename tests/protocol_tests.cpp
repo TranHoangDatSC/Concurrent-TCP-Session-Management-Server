@@ -1,9 +1,7 @@
 #include "protocol.hpp"
 #include "terminal_ui.hpp"
 
-#include <iostream>
 #include <string>
-#include <vector>
 
 int passed = 0;
 int failed = 0;
@@ -209,6 +207,16 @@ void testParseRequest() {
             "Reject oversized request"
         );
     }
+
+    // Test 7: Reject request with empty command
+    {
+        auto request = Protocol::parseRequest("|dat|123456");
+
+        check(
+            !request.has_value(),
+            "Reject request with empty command"
+        );
+    }
 }
 
 // 3. Response parsing tests
@@ -301,7 +309,7 @@ void testParseResponse() {
         );
     }
 
-    // Test 8: Parse a response that can determine OK without Payload or Pong
+    // Test 8: Parse OK responses without payload
     {
         check(
             Protocol::parseResponse("OK|LOGIN_SUCCESS").has_value(),
@@ -381,7 +389,7 @@ void testPingPong() {
             framed.frames[1] == "OK|PONG" &&
             buffer.empty() &&
             !framed.too_large,
-            "Extract PING and OK|PONG frames"
+            "Extract PING and PONG frames from buffer"
         );
     }
 
