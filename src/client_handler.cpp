@@ -6,6 +6,7 @@
 #include <unistd.h>     // POSIX system definitions
 #include <cerrno>       // Error codes
 #include <utility>      // std::move for ownership transfer
+#include <unordered_map>
 
 // Take sole ownership of client socket
 ClientHandler::ClientHandler(UniqueFd client_fd) noexcept
@@ -34,21 +35,30 @@ void ClientHandler::run() {
             // Split stream buffer into complete '\n'-delimited frames
             auto framed = Protocol::extractFrames(recv_buffer_);
 
-            // Disconnect if a single freem exceeds payload limit
+            // Disconnect if a single frame exceeds payload limit
             if (framed.too_large) {
                 const std::string err = Protocol::formatError(
                     "ERR_FRAME_TOO_LARGE",
-                    "Frame exceeds max payload size");
+                    "Frame exceeds max payload size"
+                );
                 if (!sendAll(err)) {
                     TerminalUI::print_warning(
                         "Failed to send frame-too-large error to client fd!"
                         + std::to_string(client_fd_.get())
                     );
+                } break;
+            }
+
+            bool keep_running = true;
+            for (const auto& line : framed.frames) {
+                if (!handleLine(line)) {
+                    keep_running = false;
+                    break;
                 }
-                break;
-            } for (const auto& line : framed.frames) handleLine(line);
+            } if (!keep_running) break;
         }
-        // Client closed connection clearly
+
+        // Client closed the connection gracefully
         else if (n == 0) break;
 
         // Retry if interrupted by a signal, otherwise exit loop
@@ -65,6 +75,7 @@ void ClientHandler::run() {
 bool ClientHandler::sendAll(const std::string& data) {
     if (!client_fd_.valid()) return false;
 
+    // Send data until buffer full
     std::size_t sent = 0;
     while (sent < data.size()) {
         const ssize_t n = ::send(
@@ -79,4 +90,51 @@ bool ClientHandler::sendAll(const std::string& data) {
 
         else return false;
     } return true;
+}
+
+bool ClientHandler::handleLine(const std::string& line) {
+    auto request = Protocol::parseRequest(line);
+
+    // Validate request syntax
+    if (!request.has_value()) {
+        return sendAll(Protocol::formatError(
+            "INVALID_REQUEST",
+            "Malformed request"
+        ));
+    }
+
+    // Define supported commands and their expected parameter counts
+    static const std::unordered_map<std::string, std::size_t>
+        expected_params = {
+            { "LOGIN", 2 },
+            { "LOGOUT", 0 },
+            { "LIST_USERS", 0 },
+            { "CREATE_SESSION", 1 },
+            { "ACCEPT_SESSION", 1 },
+            { "REJECT_SESSION", 1 },
+            { "END_SESSION", 1 },
+            { "LIST_SESSIONS", 0 },
+            { "PING", 0 },
+            { "QUIT", 0 }
+    };
+
+    // Validate command
+    auto it = expected_params.find(request->command);
+    if (it == expected_params.end()) {
+        return sendAll(Protocol::formatError(
+            "INVALID_COMMAND",
+            "Unsupported command"
+        ));
+    }
+
+    // Validate parameter count
+    if (request->params.size() != it->second) {
+        return sendAll(Protocol::formatError(
+            "INVALID_PARAMETERS",
+            "Incorrect number of parameters"
+        ));
+    }
+
+    // Command execution will be implemented here
+    return true;
 }
