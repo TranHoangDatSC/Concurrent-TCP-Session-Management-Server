@@ -10,7 +10,7 @@ private:
     std::string recv_buffer_;
 
     bool sendAll(const std::string& data);
-    void handleLine(const std::string& line);
+    bool handleLine(const std::string& line);
 
 public:
     explicit ClientHandler(UniqueFd client_fd) noexcept;
@@ -24,5 +24,4 @@ public:
 
     void run();
     int getClientFd() const noexcept;
-
 };
