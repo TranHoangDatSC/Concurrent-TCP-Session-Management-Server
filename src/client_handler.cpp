@@ -135,6 +135,20 @@ bool ClientHandler::handleLine(const std::string& line) {
         ));
     }
 
-    // Command execution will be implemented here
-    return true;
+    // Handle PING command
+    if (request->command == "PING")
+        return sendAll(Protocol::formatOK("PONG"));
+
+    // Handle QUIT command
+    if (request->command == "QUIT") {
+        if (!sendAll(Protocol::formatOK("BYE")))
+            return false;
+        return false; // Close this client connection
+    }
+
+    // Valid commands are not implement yet
+    return sendAll(Protocol::formatOK(
+        "NOT_IMPLEMENTED",
+        "Command is not implemented yet"
+    ));
 }
