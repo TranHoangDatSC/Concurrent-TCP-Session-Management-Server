@@ -289,14 +289,27 @@ void testParseResponse() {
         );
     }
 
-    // Test 7: Reject a response without enough separators
+    // Test 7: Reject a response without a code
     {
         auto response =
-            Protocol::parseResponse("OK|200");
+            Protocol::parseResponse("OK|");
 
         check(
             !response.has_value(),
-            "Reject malformed response"
+            "Reject response without code"
+        );
+    }
+
+    // Test 8: Parse a response that can determine OK without Payload or Pong
+    {
+        check(
+            Protocol::parseResponse("OK|LOGIN_SUCCESS").has_value(),
+            "Parse OK response without payload"
+        );
+
+        check(
+            Protocol::parseResponse("OK|PONG").has_value(),
+            "Parse PONG response"
         );
     }
 }
@@ -335,8 +348,21 @@ void testFormatResponse() {
             Protocol::formatOK("200");
 
         check(
-            response == "OK|200|\n",
-            "Format response with empty payload"
+            response == "OK|200\n",
+            "Format response without payload"
+        );
+    }
+
+    // Test 4: Format a response with and without payload
+    {
+        check(
+            Protocol::formatOK("PONG") == "OK|PONG\n",
+            "Format OK response without payload"
+        );
+        check(
+            Protocol::formatOK("SESSION_CREATED", "1001") ==
+            "OK|SESSION_CREATED|1001\n",
+            "Format OK response with payload"
         );
     }
 }
