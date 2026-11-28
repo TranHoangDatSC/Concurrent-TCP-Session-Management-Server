@@ -147,7 +147,7 @@ bool ClientHandler::handleLine(const std::string& line) {
     }
 
     // Valid commands are not implement yet
-    return sendAll(Protocol::formatOK(
+    return sendAll(Protocol::formatError(
         "NOT_IMPLEMENTED",
         "Command is not implemented yet"
     ));
