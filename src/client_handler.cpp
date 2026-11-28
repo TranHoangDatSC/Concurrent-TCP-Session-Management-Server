@@ -41,14 +41,14 @@ void ClientHandler::run() {
                     "Frame exceeds max payload size");
                 if (!sendAll(err)) {
                     TerminalUI::print_warning(
-                        "Failed to send frame-too-large error to client fd "
+                        "Failed to send frame-too-large error to client fd!"
                         + std::to_string(client_fd_.get())
                     );
                 }
                 break;
             } for (const auto& line : framed.frames) handleLine(line);
         }
-        // Client closed connection cleanly
+        // Client closed connection clearly
         else if (n == 0) break;
 
         // Retry if interrupted by a signal, otherwise exit loop
@@ -58,7 +58,7 @@ void ClientHandler::run() {
         }
     }
 
-    // Explicitlu release/close socket before thread finishes
+    // Explicitly release/close socket before thread finishes
     client_fd_.reset();
 }
 
