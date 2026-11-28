@@ -1,4 +1,5 @@
 #include "protocol.hpp"
+#include "terminal_ui.hpp"
 
 #include <iostream>
 #include <string>
@@ -10,11 +11,11 @@ int failed = 0;
 // Prints the result of one test case
 void check(bool condition, const std::string& test_name) {
     if (condition) {
-        std::cout << "[PASS] " << test_name << '\n';
+        TerminalUI::print_success(test_name);
         ++passed;
     }
     else {
-        std::cout << "[FAIL] " << test_name << '\n';
+        TerminalUI::print_error(test_name);
         ++failed;
     }
 }
@@ -415,7 +416,7 @@ void testPingPong() {
 
 // Main
 int main() {
-    std::cout << "===== CTSMS Protocol Tests =====\n\n";
+    TerminalUI::print_system("===== CTSMS Protocol Tests =====");
 
     testExtractFrames();
     testParseRequest();
@@ -423,15 +424,15 @@ int main() {
     testFormatResponse();
     testPingPong();
 
-    std::cout << "\n===== Test Summary =====\n";
-    std::cout << "Passed: " << passed << '\n';
-    std::cout << "Failed: " << failed << '\n';
+    TerminalUI::print_system("===== Test Summary =====");
+    const std::string summary =
+        "Passed: " + std::to_string(passed) + ", Failed: " + std::to_string(failed);
 
     if (failed == 0) {
-        std::cout << "\nAll tests passed!\n";
+        TerminalUI::print_success(summary + " — All tests passed!");
         return 0;
     }
 
-    std::cout << "\nSome tests failed.\n";
+    TerminalUI::print_error(summary + " — Some tests failed.");
     return 1;
 }
