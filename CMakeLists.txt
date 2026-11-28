@@ -31,3 +31,18 @@ target_link_libraries(protocol_tests
 # Enable testing
 enable_testing()
 add_test(NAME ProtocolTests COMMAND protocol_tests)
+
+# Build the client handler tests
+add_executable(client_handler_tests
+    tests/client_handler_tests.cpp
+    src/client_handler.cpp
+)
+
+target_link_libraries(client_handler_tests
+    PRIVATE ctsms_protocol
+)
+
+add_test(
+    NAME ClientHandlerTests
+    COMMAND client_handler_tests
+)
