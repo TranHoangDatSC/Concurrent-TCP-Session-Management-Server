@@ -367,6 +367,52 @@ void testFormatResponse() {
     }
 }
 
+// 5. PING and PONG Tests
+void testPingPong() {
+    // Test 1: Frame PING request and OK|PONG response over the wire
+    {
+        std::string buffer = "PING\nOK|PONG\n";
+        Protocol::FrameResult framed = Protocol::extractFrames(buffer);
+
+        check(
+            framed.frames.size() == 2 &&
+            framed.frames[0] == "PING" &&
+            framed.frames[1] == "OK|PONG" &&
+            buffer.empty() &&
+            !framed.too_large,
+            "Extract PING and OK|PONG frames"
+        );
+    }
+
+    // Test 2: Parse PING request
+    {
+        auto request = Protocol::parseRequest("PING");
+
+        check(
+            request.has_value() &&
+            request->command == "PING" &&
+            request->raw_parameters.empty() &&
+            request->params.empty(),
+            "Parse PING request"
+        );
+    }
+
+    // Test 3: Format and parse PONG response
+    {
+        const std::string wire = Protocol::formatOK("PONG");
+        auto response = Protocol::parseResponse("OK|PONG");
+
+        check(
+            wire == "OK|PONG\n" &&
+            response.has_value() &&
+            response->ok &&
+            response->code == "PONG" &&
+            response->payload.empty(),
+            "Format and parse PONG response"
+        );
+    }
+}
+
 // Main
 int main() {
     std::cout << "===== CTSMS Protocol Tests =====\n\n";
@@ -375,6 +421,7 @@ int main() {
     testParseRequest();
     testParseResponse();
     testFormatResponse();
+    testPingPong();
 
     std::cout << "\n===== Test Summary =====\n";
     std::cout << "Passed: " << passed << '\n';
