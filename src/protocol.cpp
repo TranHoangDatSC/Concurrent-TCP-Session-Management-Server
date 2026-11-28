@@ -98,7 +98,7 @@ namespace Protocol {
 
     // 3. Parse a server response
     std::optional<Response> parseResponse(const std::string& line) {
-
+        // Check for validity
         if (line.empty() || line.size() > MAX_MESSAGE_SIZE)
             return std::nullopt;
 
@@ -111,39 +111,44 @@ namespace Protocol {
         if (first_separator == std::string::npos)
             return std::nullopt;
 
+        // Extract the response type
+        std::string status = line.substr(0, first_separator);
+
         // Find the second separators
         std::size_t second_separator =
             line.find('|', first_separator + 1);
 
+        // Define the code and the payload
+        std::string code;
+        std::string payload;
+
         if (second_separator == std::string::npos)
-            return std::nullopt;
-
-        // Extract the response type
-        std::string status = line.substr(0, first_separator);
-
-        // Extract the response code
-        std::string code = line.substr(
-            first_separator + 1,
-            second_separator - first_separator - 1
-        );
+            code = line.substr(first_separator + 1);
+        else {
+            // Ex payload: OK|SESSION_CREATE|1001
+            code = line.substr(
+                first_separator + 1,
+                second_separator - first_separator - 1
+            );
+            payload = line.substr(second_separator + 1);
+        }
 
         // Only OK and ERROR are accepted
-        if (status != "OK" && status != "ERROR") {
+        if (status != "OK" && status != "ERROR")
             return std::nullopt;
-        }
 
         // The response code must not be empty
-        if (code.empty()) {
+        if (code.empty())
             return std::nullopt;
-        }
+
+        // Error reponses must contain a description field
+        if (status == "ERROR" && second_separator == std::string::npos)
+            return std::nullopt;
 
         Response response;
-
         response.ok = (status == "OK");
         response.code = code;
-
-        // Keep the remaining payload as-is
-        response.payload = line.substr(second_separator + 1);
+        response.payload = payload;
 
         return response;
     }
@@ -153,6 +158,7 @@ namespace Protocol {
         const std::string& code,
         const std::string& data
     ) {
+        if (data.empty()) return "OK|" + code + "\n";
         return "OK|" + code + "|" + data + "\n";
     }
 
